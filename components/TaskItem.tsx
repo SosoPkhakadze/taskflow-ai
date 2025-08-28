@@ -98,17 +98,29 @@ export function TaskItem({ task, onToggle, onEdit, onDelete, onAddNote, onDelete
               <div className="flex items-start space-x-4 flex-1 min-w-0">
                 {/* Enhanced checkbox */}
                 <div className="relative pt-1">
-                  <Checkbox
-                    checked={task.completed}
-                    onCheckedChange={() => onToggle(task.id)}
-                    className={`transition-all duration-300 ${
-                      task.completed 
-                        ? "bg-green-500 border-green-500 scale-110"
-                        : "border-white/30 hover:border-blue-400/50"
-                    } w-5 h-5`}
-                  />
+                  <div
+                    className="cursor-pointer"
+                    onClick={(e) => {
+                      console.log('Wrapper onClick triggered:', {
+                        taskId: task.id,
+                        currentCompleted: task.completed
+                      });
+                      e.stopPropagation();
+                      onToggle(task.id);
+                    }}
+                  >
+                    <Checkbox
+                      checked={task.completed}
+                      // Remove onCheckedChange completely - handle it with wrapper onClick
+                      className={`transition-all duration-300 ${
+                        task.completed 
+                          ? "bg-green-500 border-green-500 scale-110"
+                          : "border-white/30 hover:border-blue-400/50"
+                      } w-5 h-5 pointer-events-none`}
+                    />
+                  </div>
                   {task.completed && (
-                    <div className="absolute inset-0 rounded bg-green-500/20 animate-ping" />
+                    <div className="absolute inset-0 rounded bg-green-500/20 animate-ping pointer-events-none" />
                   )}
                 </div>
                 

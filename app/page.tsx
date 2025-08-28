@@ -51,25 +51,31 @@ export default function HomePage() {
   // This useEffect handles both the initial data load AND listens for realtime changes
   useEffect(() => {
     fetchTasks(); // Fetch initial data
-
+  
     const channel = supabase
       .channel('public-db-changes')
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public' }, // Listen for ANY change in our database
+        { 
+          event: '*', 
+          schema: 'public',
+          table: 'tasks' // Be more specific about which table to listen to
+        },
         (payload) => {
           console.log('Realtime change received!', payload);
           // When a change occurs, simply re-fetch all data to keep the UI in sync
           fetchTasks();
         }
       )
-      .subscribe();
-
+      .subscribe((status) => {
+        console.log('Realtime subscription status:', status);
+      });
+  
     // Cleanup function to remove the listener when the component unmounts
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []); // The empty array ensures this effect runs only once
+  }, []);
 
   // --- THIS IS THE KEY MODIFIED FUNCTION ---
   // Updated addTask function for app/page.tsx
@@ -142,34 +148,44 @@ const addTask = async (
   // The realtime listener makes our code much cleaner.
 
   // Fixed toggleTask function for app/page.tsx
+  // Fixed toggleTask function for app/page.tsx
+// Fixed toggleTask function for app/page.tsx
 const toggleTask = async (id: string) => {
-  // Find the task to update
-  const taskToUpdate = tasks.find(task => task.id === id);
-  if (!taskToUpdate) {
-    console.error("Task not found:", id);
-    return;
-  }
-
-  // Calculate the new completed state
-  const newCompletedState = !taskToUpdate.completed;
-  
-  console.log(`Toggling task ${id}: ${taskToUpdate.completed} -> ${newCompletedState}`);
-
   try {
-    const { error } = await supabase
+    // Find the current task
+    const currentTask = tasks.find(task => task.id === id);
+    if (!currentTask) {
+      console.error("Task not found:", id);
+      return;
+    }
+
+    // Calculate the new completed state
+    const newCompletedState = !currentTask.completed;
+    
+    console.log(`Toggling task ${id}: ${currentTask.completed} -> ${newCompletedState}`);
+
+    // Update the database with explicit boolean value
+    const { data, error } = await supabase
       .from("tasks")
       .update({ completed: newCompletedState })
-      .eq("id", id);
+      .eq("id", id)
+      .select(); // Add select to get the updated data back
 
     if (error) {
-      console.error("Error toggling task:", error);
+      console.error("Supabase error toggling task:", error);
       throw error;
     }
 
-    console.log("Task toggled successfully");
+    if (data && data.length > 0) {
+      console.log("Task toggled successfully:", data[0]);
+    } else {
+      console.warn("No data returned from update");
+    }
+
   } catch (error) {
     console.error("Failed to toggle task:", error);
     // Optional: Show user notification about the error
+    // You could also implement optimistic updates here if needed
   }
 };
 
