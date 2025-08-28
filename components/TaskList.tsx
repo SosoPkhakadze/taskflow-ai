@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { TaskItem } from "@/components/TaskItem";
 import { TaskFilters } from "@/components/TaskFilters";
 import { Task } from "@/app/page";
-import { Search, Filter, SortAsc, Grid3X3, List, CheckCircle2, Clock, AlertCircle } from "lucide-react";
+import { Search, SortAsc, Grid3X3, List, CheckCircle2, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -219,10 +219,7 @@ export function TaskList({ tasks, onToggle, onEdit, onDelete }: Props) {
             {searchQuery ? "No matching tasks found" : `No ${filter} tasks`}
           </h3>
           <p className="text-muted-foreground">
-            {searchQuery 
-              ? "Try adjusting your search terms"
-              : `You don't have any ${filter} tasks at the moment`
-            }
+            You don&apos;t have any {filter} tasks at the moment
           </p>
           {(searchQuery || filter !== "all") && (
             <Button
