@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Plus, Zap, Target, Sparkles, Loader2 } from "lucide-react";
+import { Plus, Zap, Target, Sparkles, Loader2, CheckCircle } from "lucide-react";
 
 export function TaskInput({ 
   onAddTask 
@@ -15,18 +15,31 @@ export function TaskInput({
   const [isExpanded, setIsExpanded] = useState(false);
   const [enhanceEnabled, setEnhanceEnabled] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
+  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
 
   const handleAdd = async () => {
     if (text.trim()) {
       setIsAdding(true);
       try {
         await onAddTask(text.trim(), priority, enhanceEnabled);
+        
+        // Clear form after successful submission
         setText("");
         setPriority("medium");
-        setEnhanceEnabled(false);
+        
+        // Show different success behavior based on enhancement mode
+        if (enhanceEnabled) {
+          // For AI enhancement, show a message that task will appear soon
+          setShowSuccessMessage(true);
+          setTimeout(() => setShowSuccessMessage(false), 4000);
+        }
+        
+        // Don't reset enhancement toggle - let user decide
         setIsExpanded(false);
+        
       } catch (error) {
         console.error("Error adding task:", error);
+        // You could add error toast notification here
       } finally {
         setIsAdding(false);
       }
@@ -52,6 +65,16 @@ export function TaskInput({
       <div className="absolute inset-0 bg-gradient-to-r from-blue-600/20 via-purple-600/10 to-blue-600/20 rounded-3xl blur-xl" />
       
       <div className="relative glass rounded-3xl p-6 shadow-2xl">
+        {/* Success message for AI enhancement */}
+        {showSuccessMessage && enhanceEnabled && (
+          <div className="mb-4 p-3 bg-gradient-to-r from-green-500/10 to-blue-500/10 rounded-lg border border-green-500/20 animate-fade-in">
+            <div className="flex items-center space-x-2 text-sm text-green-400">
+              <CheckCircle className="w-4 h-4" />
+              <span>Task sent for AI enhancement! It will appear in your list shortly.</span>
+            </div>
+          </div>
+        )}
+
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center space-x-3">
@@ -60,7 +83,12 @@ export function TaskInput({
             </div>
             <div>
               <h3 className="text-lg font-semibold text-foreground">Add New Task</h3>
-              <p className="text-sm text-muted-foreground">What would you like to accomplish?</p>
+              <p className="text-sm text-muted-foreground">
+                {enhanceEnabled 
+                  ? "AI will enhance your task for better clarity" 
+                  : "What would you like to accomplish?"
+                }
+              </p>
             </div>
           </div>
           <Button
@@ -80,7 +108,10 @@ export function TaskInput({
               value={text}
               onChange={(e) => setText(e.target.value)}
               onKeyPress={handleKeyPress}
-              placeholder="e.g., Design a stunning landing page for the product launch..."
+              placeholder={enhanceEnabled 
+                ? "e.g., Design landing page (AI will enhance this)" 
+                : "e.g., Design a stunning landing page for the product launch..."
+              }
               className="text-lg h-14 pl-6 pr-32 bg-background/50 border-2 border-white/10 focus:border-blue-400/50 rounded-2xl placeholder:text-muted-foreground/70 transition-all duration-300"
               disabled={isAdding}
             />
@@ -94,12 +125,12 @@ export function TaskInput({
               {isAdding ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  {enhanceEnabled ? "Enhancing..." : "Adding..."}
+                  {enhanceEnabled ? "Sending to AI..." : "Adding..."}
                 </>
               ) : (
                 <>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add
+                  {enhanceEnabled ? <Sparkles className="w-4 h-4 mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
+                  {enhanceEnabled ? "Enhance" : "Add"}
                 </>
               )}
             </Button>
@@ -163,9 +194,14 @@ export function TaskInput({
 
               {enhanceEnabled && (
                 <div className="p-3 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-lg border border-blue-500/20">
-                  <div className="flex items-center space-x-2 text-sm text-blue-400">
-                    <Sparkles className="w-4 h-4" />
-                    <span>AI will enhance your task title for better clarity and actionability</span>
+                  <div className="flex items-start space-x-2 text-sm">
+                    <Sparkles className="w-4 h-4 text-blue-400 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <div className="text-blue-400 font-medium">AI Enhancement Mode Active</div>
+                      <div className="text-blue-300/80 mt-1">
+                        Your task will be processed by AI and added automatically with improved clarity and actionability.
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
@@ -177,14 +213,16 @@ export function TaskInput({
         <div className="flex items-center justify-between mt-4 pt-4 border-t border-white/10">
           <div className="text-xs text-muted-foreground">
             {text.length > 0 && (
-              <span>{text.length} characters • Press Enter to add</span>
+              <span>
+                {text.length} characters • Press Enter to {enhanceEnabled ? "send for enhancement" : "add"}
+              </span>
             )}
           </div>
           <div className="flex items-center space-x-2 text-xs text-muted-foreground">
             <kbd className="px-2 py-1 bg-background/30 rounded-md border border-white/10">⌘</kbd>
             <span>+</span>
             <kbd className="px-2 py-1 bg-background/30 rounded-md border border-white/10">Enter</kbd>
-            <span>to quick add</span>
+            <span>to quick {enhanceEnabled ? "enhance" : "add"}</span>
           </div>
         </div>
       </div>

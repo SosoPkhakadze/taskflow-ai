@@ -78,29 +78,61 @@ export default function HomePage() {
     shouldEnhance: boolean = false
   ) => {
     if (shouldEnhance) {
-      // **FIRE-AND-FORGET LOGIC**
-      // When AI is on, we just send the request to n8n and do nothing else.
-      // We don't 'await' it. The UI is instantly free.
-      console.log("AI Enhancement enabled. Firing webhook to n8n...");
-      fetch('YOUR_N8N_PRODUCTION_URL_HERE', { // <-- PASTE YOUR N8N URL HERE
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: text, priority: priority }),
-      });
-      // The function immediately ends. It does NOT add the task itself.
-      // The realtime listener will add the task to the UI when n8n is done.
+      // **AI ENHANCEMENT MODE - FIRE AND FORGET**
+      // When AI is enabled, we ONLY send to N8N and do nothing else
+      console.log("AI Enhancement enabled. Sending to N8N workflow...");
+      
+      try {
+        // Replace with your actual N8N webhook URL
+        const response = await fetch('YOUR_N8N_PRODUCTION_URL_HERE', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify({ 
+            title: text, 
+            priority: priority 
+          }),
+        });
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        console.log("Successfully sent to N8N. Task will be created by workflow.");
+      } catch (error) {
+        console.error("Error sending to N8N:", error);
+        // Optional: Show user notification that AI enhancement failed
+        // You could add a toast notification here
+      }
+      
+      // Important: Return early - do NOT create the task locally
       return; 
     }
-
-    // **Standard Task Creation**
-    // If AI is off, we create the task directly as before.
-    // The realtime listener will also see this change and refresh the UI automatically.
-    const { error } = await supabase
-      .from("tasks")
-      .insert([{ text, priority, completed: false }]);
-
-    if (error) {
-      console.error("Error adding task:", error);
+  
+    // **STANDARD MODE - Direct database insertion**
+    // Only executed when AI enhancement is OFF
+    console.log("Standard mode: Creating task directly in database...");
+    
+    try {
+      const { error } = await supabase
+        .from("tasks")
+        .insert([{ 
+          text, 
+          priority, 
+          completed: false 
+        }]);
+  
+      if (error) {
+        console.error("Error adding task:", error);
+        throw error;
+      }
+      
+      console.log("Task created successfully in standard mode");
+    } catch (error) {
+      console.error("Database error:", error);
+      // Optional: Show user error notification
     }
   };
 
