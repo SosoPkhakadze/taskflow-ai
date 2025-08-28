@@ -9,11 +9,11 @@ import { EditTaskDialog } from "./EditTaskDialog";
 import { useState } from "react";
 
 type Props = {
-  task: Task;
-  onToggle: (id: number) => void;
-  onEdit: (id: number, newText: string) => void;
-  onDelete: (id: number) => void;
-};
+    task: Task;
+    onToggle: (id: string) => void; 
+    onEdit: (id: string, newText: string) => void; 
+    onDelete: (id: string) => void; 
+  };
 
 export function TaskItem({ task, onToggle, onEdit, onDelete }: Props) {
   const [isEditing, setIsEditing] = useState(false);
@@ -25,7 +25,8 @@ export function TaskItem({ task, onToggle, onEdit, onDelete }: Props) {
     high: { color: "from-red-500 to-pink-500", bg: "bg-red-500/10", text: "text-red-400" }
   };
 
-  const formatTimeAgo = (date: Date) => {
+  const formatTimeAgo = (dateString: string) => {
+    const date = new Date(dateString);
     const now = new Date();
     const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
     
@@ -103,7 +104,7 @@ export function TaskItem({ task, onToggle, onEdit, onDelete }: Props) {
                     {/* Time indicator */}
                     <div className="flex items-center space-x-1 text-xs text-muted-foreground">
                       <Clock className="w-3 h-3" />
-                      <span>{formatTimeAgo(task.createdAt)}</span>
+                      <span>{formatTimeAgo(task.created_at)}</span>
                     </div>
                     
                     {/* Completion indicator */}

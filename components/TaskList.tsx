@@ -9,11 +9,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 type Props = {
-  tasks: Task[];
-  onToggle: (id: number) => void;
-  onEdit: (id: number, newText: string) => void;
-  onDelete: (id: number) => void;
-};
+    tasks: Task[];
+    onToggle: (id: string) => void;  
+    onEdit: (id: string, newText: string) => void; 
+    onDelete: (id: string) => void; 
+  };
 
 export function TaskList({ tasks, onToggle, onEdit, onDelete }: Props) {
   const [filter, setFilter] = useState<"all" | "todo" | "completed">("all");
@@ -48,7 +48,7 @@ export function TaskList({ tasks, onToggle, onEdit, onDelete }: Props) {
           return a.text.localeCompare(b.text);
         case "created":
         default:
-          return b.createdAt.getTime() - a.createdAt.getTime();
+            return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
       }
     });
 
