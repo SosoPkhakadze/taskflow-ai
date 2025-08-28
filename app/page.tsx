@@ -72,82 +72,106 @@ export default function HomePage() {
   }, []); // The empty array ensures this effect runs only once
 
   // --- THIS IS THE KEY MODIFIED FUNCTION ---
-  const addTask = async (
-    text: string, 
-    priority: "low" | "medium" | "high" = "medium",
-    shouldEnhance: boolean = false
-  ) => {
-    if (shouldEnhance) {
-      // **AI ENHANCEMENT MODE - FIRE AND FORGET**
-      // When AI is enabled, we ONLY send to N8N and do nothing else
-      console.log("AI Enhancement enabled. Sending to N8N workflow...");
-      
-      try {
-        // Replace with your actual N8N webhook URL
-        const response = await fetch('YOUR_N8N_PRODUCTION_URL_HERE', {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          },
-          body: JSON.stringify({ 
-            title: text, 
-            priority: priority 
-          }),
-        });
-        
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        console.log("Successfully sent to N8N. Task will be created by workflow.");
-      } catch (error) {
-        console.error("Error sending to N8N:", error);
-        // Optional: Show user notification that AI enhancement failed
-        // You could add a toast notification here
-      }
-      
-      // Important: Return early - do NOT create the task locally
-      return; 
-    }
-  
-    // **STANDARD MODE - Direct database insertion**
-    // Only executed when AI enhancement is OFF
-    console.log("Standard mode: Creating task directly in database...");
+  // Updated addTask function for app/page.tsx
+const addTask = async (
+  text: string, 
+  priority: "low" | "medium" | "high" = "medium",
+  shouldEnhance: boolean = false
+) => {
+  if (shouldEnhance) {
+    // **AI ENHANCEMENT MODE - FIRE AND FORGET**
+    // When AI is enabled, we ONLY send to N8N and do nothing else
+    console.log("AI Enhancement enabled. Sending to N8N workflow...");
     
     try {
-      const { error } = await supabase
-        .from("tasks")
-        .insert([{ 
-          text, 
-          priority, 
-          completed: false 
-        }]);
-  
-      if (error) {
-        console.error("Error adding task:", error);
-        throw error;
+      // Your actual N8N webhook URL
+      const response = await fetch('https://sosopkhakadze.app.n8n.cloud/webhook/06accbd7-96d9-4dbe-ad88-f6f5af121f14', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({ 
+          title: text, 
+          priority: priority 
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
       
-      console.log("Task created successfully in standard mode");
+      console.log("Successfully sent to N8N. Task will be created by workflow.");
     } catch (error) {
-      console.error("Database error:", error);
-      // Optional: Show user error notification
+      console.error("Error sending to N8N:", error);
+      // Optional: Show user notification that AI enhancement failed
+      // You could add a toast notification here
     }
-  };
+    
+    // Important: Return early - do NOT create the task locally
+    return; 
+  }
+
+  // **STANDARD MODE - Direct database insertion**
+  // Only executed when AI enhancement is OFF
+  console.log("Standard mode: Creating task directly in database...");
+  
+  try {
+    const { error } = await supabase
+      .from("tasks")
+      .insert([{ 
+        text, 
+        priority, 
+        completed: false 
+      }]);
+
+    if (error) {
+      console.error("Error adding task:", error);
+      throw error;
+    }
+    
+    console.log("Task created successfully in standard mode");
+  } catch (error) {
+    console.error("Database error:", error);
+    // Optional: Show user error notification
+  }
+};
 
   // --- ALL OTHER FUNCTIONS ARE NOW SIMPLIFIED ---
   // We no longer need to call setTasks() manually after each operation.
   // The realtime listener makes our code much cleaner.
 
-  const toggleTask = async (id: string) => {
-    const taskToUpdate = tasks.find(task => task.id === id);
-    if (!taskToUpdate) return;
-    await supabase
+  // Fixed toggleTask function for app/page.tsx
+const toggleTask = async (id: string) => {
+  // Find the task to update
+  const taskToUpdate = tasks.find(task => task.id === id);
+  if (!taskToUpdate) {
+    console.error("Task not found:", id);
+    return;
+  }
+
+  // Calculate the new completed state
+  const newCompletedState = !taskToUpdate.completed;
+  
+  console.log(`Toggling task ${id}: ${taskToUpdate.completed} -> ${newCompletedState}`);
+
+  try {
+    const { error } = await supabase
       .from("tasks")
-      .update({ completed: !taskToUpdate.completed })
+      .update({ completed: newCompletedState })
       .eq("id", id);
-  };
+
+    if (error) {
+      console.error("Error toggling task:", error);
+      throw error;
+    }
+
+    console.log("Task toggled successfully");
+  } catch (error) {
+    console.error("Failed to toggle task:", error);
+    // Optional: Show user notification about the error
+  }
+};
 
   const editTask = async (id: string, newText: string) => {
     await supabase.from("tasks").update({ text: newText }).eq("id", id);
