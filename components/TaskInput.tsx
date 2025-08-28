@@ -3,19 +3,33 @@
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Plus, Sparkles, Zap, Target } from "lucide-react";
+import { Plus, Zap, Target, Sparkles, Loader2 } from "lucide-react";
 
-export function TaskInput({ onAddTask }: { onAddTask: (text: string, priority?: "low" | "medium" | "high") => void }) {
+export function TaskInput({ 
+  onAddTask 
+}: { 
+  onAddTask: (text: string, priority?: "low" | "medium" | "high", shouldEnhance?: boolean) => Promise<void>
+}) {
   const [text, setText] = useState("");
   const [priority, setPriority] = useState<"low" | "medium" | "high">("medium");
   const [isExpanded, setIsExpanded] = useState(false);
+  const [enhanceEnabled, setEnhanceEnabled] = useState(false);
+  const [isAdding, setIsAdding] = useState(false);
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     if (text.trim()) {
-      onAddTask(text.trim(), priority);
-      setText("");
-      setPriority("medium");
-      setIsExpanded(false);
+      setIsAdding(true);
+      try {
+        await onAddTask(text.trim(), priority, enhanceEnabled);
+        setText("");
+        setPriority("medium");
+        setEnhanceEnabled(false);
+        setIsExpanded(false);
+      } catch (error) {
+        console.error("Error adding task:", error);
+      } finally {
+        setIsAdding(false);
+      }
     }
   };
 
@@ -49,7 +63,6 @@ export function TaskInput({ onAddTask }: { onAddTask: (text: string, priority?: 
               <p className="text-sm text-muted-foreground">What would you like to accomplish?</p>
             </div>
           </div>
-          
           <Button
             variant="ghost"
             size="sm"
@@ -69,16 +82,26 @@ export function TaskInput({ onAddTask }: { onAddTask: (text: string, priority?: 
               onKeyPress={handleKeyPress}
               placeholder="e.g., Design a stunning landing page for the product launch..."
               className="text-lg h-14 pl-6 pr-32 bg-background/50 border-2 border-white/10 focus:border-blue-400/50 rounded-2xl placeholder:text-muted-foreground/70 transition-all duration-300"
+              disabled={isAdding}
             />
             
             {/* Quick add button */}
             <Button
               onClick={handleAdd}
-              disabled={!text.trim()}
+              disabled={!text.trim() || isAdding}
               className="absolute right-2 top-2 h-10 px-6 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <Plus className="w-4 h-4 mr-2" />
-              Add
+              {isAdding ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  {enhanceEnabled ? "Enhancing..." : "Adding..."}
+                </>
+              ) : (
+                <>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add
+                </>
+              )}
             </Button>
           </div>
 
@@ -91,22 +114,21 @@ export function TaskInput({ onAddTask }: { onAddTask: (text: string, priority?: 
                   {(Object.keys(priorityConfig) as Array<keyof typeof priorityConfig>).map((level) => {
                     const config = priorityConfig[level];
                     const Icon = config.icon;
-                    
                     return (
                       <button
                         key={level}
                         onClick={() => setPriority(level)}
+                        disabled={isAdding}
                         className={`relative px-4 py-2 rounded-xl text-sm font-medium transition-all duration-300 ${
                           priority === level
                             ? `bg-gradient-to-r ${config.color} text-white shadow-lg scale-105`
                             : "bg-background/30 text-muted-foreground hover:bg-background/50"
-                        }`}
+                        } disabled:opacity-50`}
                       >
                         <div className="flex items-center space-x-2">
                           <Icon className="w-4 h-4" />
                           <span>{config.label}</span>
                         </div>
-                        
                         {priority === level && (
                           <div className="absolute inset-0 rounded-xl bg-white/20 animate-pulse" />
                         )}
@@ -116,16 +138,37 @@ export function TaskInput({ onAddTask }: { onAddTask: (text: string, priority?: 
                 </div>
               </div>
 
-              {/* AI suggestions (placeholder for future enhancement) */}
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <div className="flex items-center space-x-2">
-                  <Sparkles className="w-3 h-3 animate-pulse" />
-                  <span>AI suggestions based on your work patterns</span>
+              {/* AI Enhancement Toggle */}
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium text-muted-foreground">AI Enhancement</label>
+                <div className="flex items-center space-x-3">
+                  <span className="text-sm text-muted-foreground">
+                    {enhanceEnabled ? "ON" : "OFF"}
+                  </span>
+                  <button
+                    onClick={() => setEnhanceEnabled(!enhanceEnabled)}
+                    disabled={isAdding}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 ${
+                      enhanceEnabled ? "bg-gradient-to-r from-blue-500 to-purple-600" : "bg-gray-600"
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-300 ${
+                        enhanceEnabled ? "translate-x-6" : "translate-x-1"
+                      }`}
+                    />
+                  </button>
                 </div>
-                <span className="px-2 py-1 bg-gradient-to-r from-purple-500/20 to-blue-500/20 rounded-full">
-                  Coming Soon
-                </span>
               </div>
+
+              {enhanceEnabled && (
+                <div className="p-3 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-lg border border-blue-500/20">
+                  <div className="flex items-center space-x-2 text-sm text-blue-400">
+                    <Sparkles className="w-4 h-4" />
+                    <span>AI will enhance your task title for better clarity and actionability</span>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -137,7 +180,6 @@ export function TaskInput({ onAddTask }: { onAddTask: (text: string, priority?: 
               <span>{text.length} characters • Press Enter to add</span>
             )}
           </div>
-          
           <div className="flex items-center space-x-2 text-xs text-muted-foreground">
             <kbd className="px-2 py-1 bg-background/30 rounded-md border border-white/10">⌘</kbd>
             <span>+</span>

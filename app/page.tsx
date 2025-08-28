@@ -6,81 +6,117 @@ import { TaskInput } from "@/components/TaskInput";
 import { TaskList } from "@/components/TaskList";
 import { Header } from "@/components/Header";
 import { Zap, TrendingUp, CheckCircle2 } from "lucide-react";
-import { supabase } from "@/lib/supabaseClient"; // <-- IMPORT Supabase client
+import { supabase } from "@/lib/supabaseClient";
 
-// ---
-// STEP 1: Update the Task type to match our Supabase table
-// `id` is now a string (UUID), and we'll use `created_at` to match the column name.
-// ---
+export type TaskNote = {
+  id: string;
+  task_id: string;
+  content: string;
+  created_at: string;
+};
+
 export type Task = {
   id: string;
   text: string;
   completed: boolean;
-  created_at: string; // Changed from createdAt: Date
+  created_at: string;
   priority: "low" | "medium" | "high";
+  notes?: TaskNote[];
 };
 
 export default function HomePage() {
-  // The local state now starts empty and will be filled by data from Supabase.
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [loading, setLoading] = useState(true); // Add a loading state
+  const [loading, setLoading] = useState(true);
 
-  // ---
-  // STEP 2: Fetch tasks from Supabase when the component mounts
-  // ---
   useEffect(() => {
     const fetchTasks = async () => {
       setLoading(true);
-      // Select all tasks, ordered by the creation date so newest are first
+      
+      // Fetch tasks with their notes
       const { data, error } = await supabase
         .from("tasks")
-        .select("*")
+        .select(`
+          *,
+          task_notes (
+            id,
+            task_id,
+            content,
+            created_at
+          )
+        `)
         .order("created_at", { ascending: false });
 
       if (error) {
         console.error("Error fetching tasks:", error);
       } else if (data) {
-        setTasks(data);
+        // Transform the data to match our Task type
+        const transformedTasks = data.map(task => ({
+          ...task,
+          notes: task.task_notes || []
+        }));
+        setTasks(transformedTasks);
       }
+      
       setLoading(false);
     };
 
     fetchTasks();
-  }, []); // The empty dependency array means this runs once on mount
+  }, []);
 
-  // ---
-  // STEP 3: Refactor all functions to be `async` and use Supabase
-  // ---
+  const enhanceTaskTitle = async (title: string): Promise<string> => {
+    try {
+      const response = await fetch('https://sosopkhakadze.app.n8n.cloud/webhook/06accbd7-96d9-4dbe-ad88-f6f5af121f14', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ title }),
+      });
 
-  const addTask = async (text: string, priority: "low" | "medium" | "high" = "medium") => {
-    // ---
-    // THE FIX:
-    // 1. Pass the new task as an object inside an array: `[{ ... }]`. This is the required syntax.
-    // 2. Use `.select()` immediately after `.insert()`. This tells Supabase to perform the
-    //    insert and then immediately return the full row that was just created, including
-    //    the database-generated values like `id` and `created_at`.
-    // ---
-    const { data, error } = await supabase
-      .from("tasks")
-      .insert([{ text, priority, completed: false }]) // <-- Use an array here
-      .select()                                       // <-- And chain .select()
-      .single(); // <-- .single() is a helper to get the first object from the returned array
-  
-    if (error) {
-      console.error("Error adding task:", error);
-      // You can add user-facing error handling here if you like
-    } else if (data) {
-      // Now `data` is the complete new task object from the database.
-      // We can add it to our local state instantly. This is called an "optimistic update".
-      setTasks((prevTasks) => [data, ...prevTasks]);
+      if (response.ok) {
+        const data = await response.json();
+        // Assuming the webhook returns the enhanced title in a 'enhanced_title' field
+        return data.enhanced_title || data.title || title;
+      } else {
+        console.error('Failed to enhance task title:', response.statusText);
+        return title; // Fallback to original title
+      }
+    } catch (error) {
+      console.error('Error enhancing task title:', error);
+      return title; // Fallback to original title
     }
   };
 
-  const toggleTask = async (id: string) => { // id is now a string
+  const addTask = async (
+    text: string, 
+    priority: "low" | "medium" | "high" = "medium",
+    shouldEnhance: boolean = false
+  ) => {
+    let finalTitle = text;
+    
+    // Enhance the title if requested
+    if (shouldEnhance) {
+      finalTitle = await enhanceTaskTitle(text);
+    }
+
+    const { data, error } = await supabase
+      .from("tasks")
+      .insert([{ text: finalTitle, priority, completed: false }])
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Error adding task:", error);
+    } else if (data) {
+      // Add the new task with empty notes array
+      setTasks((prevTasks) => [{ ...data, notes: [] }, ...prevTasks]);
+    }
+  };
+
+  const toggleTask = async (id: string) => {
     const taskToUpdate = tasks.find(task => task.id === id);
     if (!taskToUpdate) return;
 
-    // `update` the 'completed' status for the task where 'id' matches
     const { error } = await supabase
       .from("tasks")
       .update({ completed: !taskToUpdate.completed })
@@ -89,7 +125,6 @@ export default function HomePage() {
     if (error) {
       console.error("Error toggling task:", error);
     } else {
-      // Update the local state for instant UI feedback
       setTasks((prev) =>
         prev.map((task) =>
           task.id === id ? { ...task, completed: !task.completed } : task
@@ -98,36 +133,74 @@ export default function HomePage() {
     }
   };
 
-  const editTask = async (id: string, newText: string) => { // id is now a string
-    // `update` the 'text' for the task where 'id' matches
+  const editTask = async (id: string, newText: string) => {
     const { error } = await supabase
       .from("tasks")
       .update({ text: newText })
       .eq("id", id);
-    
+
     if (error) {
       console.error("Error editing task:", error);
     } else {
-      // Update local state
       setTasks((prev) =>
-        prev.map((task) => (task.id === id ? { ...task, text: newText } : task))
+        prev.map((task) =>
+          task.id === id ? { ...task, text: newText } : task
+        )
       );
     }
   };
 
-  const deleteTask = async (id: string) => { // id is now a string
-    // `delete` the row where 'id' matches
+  const deleteTask = async (id: string) => {
     const { error } = await supabase.from("tasks").delete().eq("id", id);
-    
+
     if (error) {
       console.error("Error deleting task:", error);
     } else {
-      // Update local state by filtering out the deleted task
       setTasks((prev) => prev.filter((task) => task.id !== id));
     }
   };
 
-  // Calculate stats (this logic remains the same)
+  const addTaskNote = async (taskId: string, content: string) => {
+    const { data, error } = await supabase
+      .from("task_notes")
+      .insert([{ task_id: taskId, content }])
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Error adding note:", error);
+    } else if (data) {
+      // Update the local state
+      setTasks(prev =>
+        prev.map(task =>
+          task.id === taskId
+            ? { ...task, notes: [...(task.notes || []), data] }
+            : task
+        )
+      );
+    }
+  };
+
+  const deleteTaskNote = async (taskId: string, noteId: string) => {
+    const { error } = await supabase
+      .from("task_notes")
+      .delete()
+      .eq("id", noteId);
+
+    if (error) {
+      console.error("Error deleting note:", error);
+    } else {
+      // Update the local state
+      setTasks(prev =>
+        prev.map(task =>
+          task.id === taskId
+            ? { ...task, notes: task.notes?.filter(note => note.id !== noteId) || [] }
+            : task
+        )
+      );
+    }
+  };
+
   const totalTasks = tasks.length;
   const completedTasks = tasks.filter(task => task.completed).length;
   const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
@@ -137,7 +210,7 @@ export default function HomePage() {
       <div className="fixed top-20 left-10 w-20 h-20 bg-blue-500/10 rounded-full blur-xl animate-pulse" />
       <div className="fixed top-40 right-20 w-32 h-32 bg-purple-500/10 rounded-full blur-xl animate-pulse delay-1000" />
       <div className="fixed bottom-20 left-1/4 w-24 h-24 bg-pink-500/10 rounded-full blur-xl animate-pulse delay-2000" />
-      
+
       <main className="relative max-w-4xl mx-auto py-8 px-4">
         <Header />
 
@@ -153,10 +226,9 @@ export default function HomePage() {
               <Zap className="w-8 h-8 text-yellow-400 animate-bounce" />
             </div>
           </div>
-          
           <p className="text-xl md:text-2xl text-muted-foreground mb-8 max-w-2xl mx-auto leading-relaxed">
-            Your <span className="text-blue-400 font-semibold">intelligent</span> task management hub with 
-            <span className="text-purple-400 font-semibold"> AI-powered</span> productivity insights
+            Your <span className="text-blue-400 font-semibold">intelligent</span> task management hub with{" "}
+            <span className="text-purple-400 font-semibold">AI-powered</span> productivity insights
           </p>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-3xl mx-auto mb-8">
@@ -167,7 +239,6 @@ export default function HomePage() {
               <div className="text-2xl font-bold text-foreground">{totalTasks}</div>
               <div className="text-sm text-muted-foreground">Total Tasks</div>
             </div>
-            
             <div className="glass rounded-2xl p-6 text-center group hover:scale-105 transition-all duration-300">
               <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-xl mx-auto mb-3 flex items-center justify-center">
                 <CheckCircle2 className="w-6 h-6 text-white" />
@@ -175,7 +246,6 @@ export default function HomePage() {
               <div className="text-2xl font-bold text-foreground">{completedTasks}</div>
               <div className="text-sm text-muted-foreground">Completed</div>
             </div>
-            
             <div className="glass rounded-2xl p-6 text-center group hover:scale-105 transition-all duration-300">
               <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl mx-auto mb-3 flex items-center justify-center">
                 <TrendingUp className="w-6 h-6 text-white" />
@@ -192,13 +262,14 @@ export default function HomePage() {
           </div>
 
           <div className="animate-fade-up" style={{ animationDelay: '0.4s' }}>
-            {/* We can show a loading spinner or skeleton here in the future */}
             {!loading && (
               <TaskList
                 tasks={tasks}
                 onToggle={toggleTask}
                 onEdit={editTask}
                 onDelete={deleteTask}
+                onAddNote={addTaskNote}
+                onDeleteNote={deleteTaskNote}
               />
             )}
           </div>

@@ -9,13 +9,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 type Props = {
-    tasks: Task[];
-    onToggle: (id: string) => void;  
-    onEdit: (id: string, newText: string) => void; 
-    onDelete: (id: string) => void; 
-  };
+  tasks: Task[];
+  onToggle: (id: string) => void;
+  onEdit: (id: string, newText: string) => void;
+  onDelete: (id: string) => void;
+  onAddNote: (taskId: string, content: string) => void;
+  onDeleteNote: (taskId: string, noteId: string) => void;
+};
 
-export function TaskList({ tasks, onToggle, onEdit, onDelete }: Props) {
+export function TaskList({ tasks, onToggle, onEdit, onDelete, onAddNote, onDeleteNote }: Props) {
   const [filter, setFilter] = useState<"all" | "todo" | "completed">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<"created" | "priority" | "alphabetical">("created");
@@ -27,7 +29,10 @@ export function TaskList({ tasks, onToggle, onEdit, onDelete }: Props) {
     // Apply text filter
     if (searchQuery.trim()) {
       filtered = filtered.filter(task =>
-        task.text.toLowerCase().includes(searchQuery.toLowerCase())
+        task.text.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        task.notes?.some(note => 
+          note.content.toLowerCase().includes(searchQuery.toLowerCase())
+        )
       );
     }
 
@@ -48,7 +53,7 @@ export function TaskList({ tasks, onToggle, onEdit, onDelete }: Props) {
           return a.text.localeCompare(b.text);
         case "created":
         default:
-            return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
       }
     });
 
@@ -60,33 +65,31 @@ export function TaskList({ tasks, onToggle, onEdit, onDelete }: Props) {
     const completed = tasks.filter(t => t.completed).length;
     const pending = total - completed;
     const highPriority = tasks.filter(t => t.priority === "high" && !t.completed).length;
-
-    return { total, completed, pending, highPriority };
+    const totalNotes = tasks.reduce((acc, task) => acc + (task.notes?.length || 0), 0);
+    
+    return { total, completed, pending, highPriority, totalNotes };
   }, [tasks]);
 
   if (tasks.length === 0) {
     return (
       <div className="relative">
         <div className="absolute inset-0 bg-gradient-to-r from-blue-600/10 via-purple-600/5 to-blue-600/10 rounded-3xl blur-xl" />
-        
         <div className="relative glass rounded-3xl p-12 text-center">
           <div className="w-24 h-24 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
             <CheckCircle2 className="w-12 h-12 text-muted-foreground" />
           </div>
-          
           <h3 className="text-2xl font-bold text-foreground mb-3">Ready to be productive?</h3>
           <p className="text-muted-foreground text-lg mb-6 max-w-md mx-auto">
             Start by creating your first task above. Let's turn your ideas into achievements!
           </p>
-          
           <div className="flex items-center justify-center space-x-4 text-sm text-muted-foreground">
             <div className="flex items-center space-x-2">
               <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse" />
-              <span>AI-powered suggestions</span>
+              <span>AI-powered task enhancement</span>
             </div>
             <div className="flex items-center space-x-2">
               <div className="w-2 h-2 bg-purple-400 rounded-full animate-pulse" />
-              <span>Smart prioritization</span>
+              <span>Smart note-taking</span>
             </div>
           </div>
         </div>
@@ -99,7 +102,6 @@ export function TaskList({ tasks, onToggle, onEdit, onDelete }: Props) {
       {/* Header with stats and controls */}
       <div className="relative">
         <div className="absolute inset-0 bg-gradient-to-r from-blue-600/10 via-purple-600/5 to-blue-600/10 rounded-2xl blur-xl" />
-        
         <div className="relative glass rounded-2xl p-6">
           {/* Stats row */}
           <div className="flex items-center justify-between mb-6">
@@ -127,8 +129,16 @@ export function TaskList({ tasks, onToggle, onEdit, onDelete }: Props) {
                   </div>
                 </>
               )}
+              {stats.totalNotes > 0 && (
+                <>
+                  <div className="w-px h-8 bg-white/10" />
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-purple-400">{stats.totalNotes}</div>
+                    <div className="text-xs text-muted-foreground">Notes</div>
+                  </div>
+                </>
+              )}
             </div>
-            
             <div className="flex items-center space-x-2">
               <Button
                 variant={viewMode === "list" ? "default" : "ghost"}
@@ -157,11 +167,11 @@ export function TaskList({ tasks, onToggle, onEdit, onDelete }: Props) {
               <Input
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search tasks..."
+                placeholder="Search tasks and notes..."
                 className="pl-10 bg-background/30 border-white/10 focus:border-blue-400/50"
               />
             </div>
-
+            
             {/* Sort dropdown */}
             <div className="flex items-center space-x-2">
               <Button
@@ -198,6 +208,8 @@ export function TaskList({ tasks, onToggle, onEdit, onDelete }: Props) {
               onToggle={onToggle}
               onEdit={onEdit}
               onDelete={onDelete}
+              onAddNote={onAddNote}
+              onDeleteNote={onDeleteNote}
             />
           </div>
         ))}
