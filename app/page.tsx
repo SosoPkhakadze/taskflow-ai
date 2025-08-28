@@ -28,178 +28,112 @@ export default function HomePage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchTasks = async () => {
-      setLoading(true);
-      
-      // Fetch tasks with their notes
-      const { data, error } = await supabase
-        .from("tasks")
-        .select(`
-          *,
-          task_notes (
-            id,
-            task_id,
-            content,
-            created_at
-          )
-        `)
-        .order("created_at", { ascending: false });
+  // This single function is now the source of truth for loading data
+  const fetchTasks = async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("tasks")
+      .select(`*, task_notes(*)`)
+      .order("created_at", { ascending: false });
 
-      if (error) {
-        console.error("Error fetching tasks:", error);
-      } else if (data) {
-        // Transform the data to match our Task type
-        const transformedTasks = data.map(task => ({
-          ...task,
-          notes: task.task_notes || []
-        }));
-        setTasks(transformedTasks);
-      }
-      
-      setLoading(false);
-    };
-
-    fetchTasks();
-  }, []);
-
-  const enhanceTaskTitle = async (title: string): Promise<string> => {
-    try {
-      const response = await fetch('https://sosopkhakadze.app.n8n.cloud/webhook/06accbd7-96d9-4dbe-ad88-f6f5af121f14', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ title }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        // Assuming the webhook returns the enhanced title in a 'enhanced_title' field
-        return data.enhanced_title || data.title || title;
-      } else {
-        console.error('Failed to enhance task title:', response.statusText);
-        return title; // Fallback to original title
-      }
-    } catch (error) {
-      console.error('Error enhancing task title:', error);
-      return title; // Fallback to original title
+    if (error) {
+      console.error("Error fetching tasks:", error);
+    } else if (data) {
+      const transformedTasks = data.map(task => ({
+        ...task,
+        notes: task.task_notes.sort((a: TaskNote, b: TaskNote) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()) || []
+      }));
+      setTasks(transformedTasks);
     }
+    setLoading(false);
   };
 
+  // This useEffect handles both the initial data load AND listens for realtime changes
+  useEffect(() => {
+    fetchTasks(); // Fetch initial data
+
+    const channel = supabase
+      .channel('public-db-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public' }, // Listen for ANY change in our database
+        (payload) => {
+          console.log('Realtime change received!', payload);
+          // When a change occurs, simply re-fetch all data to keep the UI in sync
+          fetchTasks();
+        }
+      )
+      .subscribe();
+
+    // Cleanup function to remove the listener when the component unmounts
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []); // The empty array ensures this effect runs only once
+
+  // --- THIS IS THE KEY MODIFIED FUNCTION ---
   const addTask = async (
     text: string, 
     priority: "low" | "medium" | "high" = "medium",
     shouldEnhance: boolean = false
   ) => {
-    let finalTitle = text;
-    
-    // Enhance the title if requested
     if (shouldEnhance) {
-      finalTitle = await enhanceTaskTitle(text);
+      // **FIRE-AND-FORGET LOGIC**
+      // When AI is on, we just send the request to n8n and do nothing else.
+      // We don't 'await' it. The UI is instantly free.
+      console.log("AI Enhancement enabled. Firing webhook to n8n...");
+      fetch('YOUR_N8N_PRODUCTION_URL_HERE', { // <-- PASTE YOUR N8N URL HERE
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: text, priority: priority }),
+      });
+      // The function immediately ends. It does NOT add the task itself.
+      // The realtime listener will add the task to the UI when n8n is done.
+      return; 
     }
 
-    const { data, error } = await supabase
+    // **Standard Task Creation**
+    // If AI is off, we create the task directly as before.
+    // The realtime listener will also see this change and refresh the UI automatically.
+    const { error } = await supabase
       .from("tasks")
-      .insert([{ text: finalTitle, priority, completed: false }])
-      .select()
-      .single();
+      .insert([{ text, priority, completed: false }]);
 
     if (error) {
       console.error("Error adding task:", error);
-    } else if (data) {
-      // Add the new task with empty notes array
-      setTasks((prevTasks) => [{ ...data, notes: [] }, ...prevTasks]);
     }
   };
+
+  // --- ALL OTHER FUNCTIONS ARE NOW SIMPLIFIED ---
+  // We no longer need to call setTasks() manually after each operation.
+  // The realtime listener makes our code much cleaner.
 
   const toggleTask = async (id: string) => {
     const taskToUpdate = tasks.find(task => task.id === id);
     if (!taskToUpdate) return;
-
-    const { error } = await supabase
+    await supabase
       .from("tasks")
       .update({ completed: !taskToUpdate.completed })
       .eq("id", id);
-
-    if (error) {
-      console.error("Error toggling task:", error);
-    } else {
-      setTasks((prev) =>
-        prev.map((task) =>
-          task.id === id ? { ...task, completed: !task.completed } : task
-        )
-      );
-    }
   };
 
   const editTask = async (id: string, newText: string) => {
-    const { error } = await supabase
-      .from("tasks")
-      .update({ text: newText })
-      .eq("id", id);
-
-    if (error) {
-      console.error("Error editing task:", error);
-    } else {
-      setTasks((prev) =>
-        prev.map((task) =>
-          task.id === id ? { ...task, text: newText } : task
-        )
-      );
-    }
+    await supabase.from("tasks").update({ text: newText }).eq("id", id);
   };
 
   const deleteTask = async (id: string) => {
-    const { error } = await supabase.from("tasks").delete().eq("id", id);
-
-    if (error) {
-      console.error("Error deleting task:", error);
-    } else {
-      setTasks((prev) => prev.filter((task) => task.id !== id));
-    }
+    await supabase.from("tasks").delete().eq("id", id);
   };
 
   const addTaskNote = async (taskId: string, content: string) => {
-    const { data, error } = await supabase
-      .from("task_notes")
-      .insert([{ task_id: taskId, content }])
-      .select()
-      .single();
-
-    if (error) {
-      console.error("Error adding note:", error);
-    } else if (data) {
-      // Update the local state
-      setTasks(prev =>
-        prev.map(task =>
-          task.id === taskId
-            ? { ...task, notes: [...(task.notes || []), data] }
-            : task
-        )
-      );
-    }
+    await supabase.from("task_notes").insert([{ task_id: taskId, content }]);
   };
 
   const deleteTaskNote = async (taskId: string, noteId: string) => {
-    const { error } = await supabase
-      .from("task_notes")
-      .delete()
-      .eq("id", noteId);
-
-    if (error) {
-      console.error("Error deleting note:", error);
-    } else {
-      // Update the local state
-      setTasks(prev =>
-        prev.map(task =>
-          task.id === taskId
-            ? { ...task, notes: task.notes?.filter(note => note.id !== noteId) || [] }
-            : task
-        )
-      );
-    }
+    await supabase.from("task_notes").delete().eq("id", noteId);
   };
+  
+  // --- The rest of your component remains the same ---
 
   const totalTasks = tasks.length;
   const completedTasks = tasks.filter(task => task.completed).length;
