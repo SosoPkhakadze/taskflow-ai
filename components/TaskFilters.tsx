@@ -7,10 +7,14 @@ type Filter = "all" | "todo" | "completed";
 
 export function TaskFilters({
   onFilterChange,
+  activeFilter,
 }: {
   onFilterChange: (filter: Filter) => void;
+  activeFilter?: Filter;
 }) {
   const [active, setActive] = useState<Filter>("all");
+
+  const current = activeFilter ?? active;
 
   const handleClick = (filter: Filter) => {
     setActive(filter);
@@ -20,7 +24,7 @@ export function TaskFilters({
   return (
     <div className="flex justify-center gap-4 mt-8">
       <Button
-          variant={active === "all" ? "default" : "outline"}
+          variant={current === "all" ? "default" : "outline"}
           onClick={() => handleClick("all")}
           className="cursor-pointer rounded-full px-4 py-1 transition-all duration-300 hover:bg-blue-500/20"
         >
@@ -28,14 +32,14 @@ export function TaskFilters({
       </Button>
 
       <Button
-        variant={active === "todo" ? "default" : "outline"}
+        variant={current === "todo" ? "default" : "outline"}
         onClick={() => handleClick("todo")}
         className="cursor-pointer"
       >
         To-Do
       </Button>
       <Button
-        variant={active === "completed" ? "default" : "outline"}
+        variant={current === "completed" ? "default" : "outline"}
         onClick={() => handleClick("completed")}
         className="cursor-pointer"
       >
