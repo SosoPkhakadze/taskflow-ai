@@ -83,19 +83,7 @@ export function EditTaskDialog({ open, onOpenChange, initialText, onSave }: Prop
             </div>
           </div>
 
-          {/* AI suggestion placeholder */}
-          <div className="glass rounded-xl p-4 border border-white/10">
-            <div className="flex items-center space-x-2 mb-2">
-              <Sparkles className="w-4 h-4 text-purple-400 animate-pulse" />
-              <span className="text-sm font-medium text-muted-foreground">AI Enhancement</span>
-              <span className="px-2 py-0.5 bg-gradient-to-r from-purple-500/20 to-blue-500/20 rounded-full text-xs">
-                Coming Soon
-              </span>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Soon, AI will help suggest improvements and break down complex tasks automatically.
-            </p>
-          </div>
+          
         </div>
 
         {/* Footer */}
