@@ -24,6 +24,10 @@ export function TaskItem({ task, onToggle, onEdit, onDelete, onAddNote, onDelete
   const [showNotes, setShowNotes] = useState(false);
   const [newNote, setNewNote] = useState("");
   const [isAddingNote, setIsAddingNote] = useState(false);
+  
+  // ✨ FIX: Create a safe priority value that defaults to 'medium' if task.priority is null or undefined.
+  // This prevents the application from crashing if a task has bad data.
+  const safePriority = task.priority || 'medium';
 
   const priorityConfig = {
     low: { color: "from-green-500 to-green-600", bg: "bg-green-500/10", text: "text-green-400" },
@@ -88,7 +92,8 @@ export function TaskItem({ task, onToggle, onEdit, onDelete, onAddNote, onDelete
             : "border-white/10 hover:border-blue-400/30"
         } ${isHovered ? "scale-[1.02] shadow-xl" : "scale-100"} rounded-2xl overflow-hidden`}>
           {/* Priority indicator bar */}
-          <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${priorityConfig[task.priority].color} ${
+          {/* ✨ FIX: Use the 'safePriority' variable here to prevent crash */}
+          <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${priorityConfig[safePriority].color} ${
             task.completed ? "opacity-50" : "opacity-100"
           }`} />
           
@@ -139,9 +144,10 @@ export function TaskItem({ task, onToggle, onEdit, onDelete, onAddNote, onDelete
                   {/* Task metadata */}
                   <div className="flex items-center space-x-4 mt-3">
                     {/* Priority badge */}
-                    <div className={`inline-flex items-center space-x-1 px-2 py-1 rounded-full text-xs font-medium ${priorityConfig[task.priority].bg} ${priorityConfig[task.priority].text}`}>
+                    {/* ✨ FIX: Use the 'safePriority' variable here as well */}
+                    <div className={`inline-flex items-center space-x-1 px-2 py-1 rounded-full text-xs font-medium ${priorityConfig[safePriority].bg} ${priorityConfig[safePriority].text}`}>
                       <Flag className="w-3 h-3" />
-                      <span className="capitalize">{task.priority}</span>
+                      <span className="capitalize">{safePriority}</span>
                     </div>
                     
                     {/* Time indicator */}
