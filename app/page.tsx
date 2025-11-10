@@ -91,7 +91,7 @@ const addTask = async (
     
     try {
       // Your actual N8N webhook URL
-      const response = await fetch('https://soso-pkhakadze.app.n8n.cloud/webhook/0caa17ec-148e-4754-a38d-5cd803207428', {
+      const response = await fetch('http://localhost:5678/webhook/0caa17ec-148e-4754-a38d-5cd803207428', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
